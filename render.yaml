@@ -3,7 +3,7 @@ services:
 name: short-url-php
 env: docker
 plan: free
-repo: https://github.com/USERNAME/REPO-NAME
+repo: https://github.com/ocimnet/short-url
 region: oregon
 branch: main
 buildCommand: ""
