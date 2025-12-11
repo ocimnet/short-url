@@ -1,1 +1,11 @@
-
+services:
+- type: web
+name: short-url-php
+env: docker
+plan: free
+repo: https://github.com/ocimnet/short-url
+region: oregon
+branch: main
+buildCommand: ""
+startCommand: "php -S 0.0.0.0:10000"
+dockerfilePath: ./Dockerfile
