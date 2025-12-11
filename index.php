@@ -1,4 +1,53 @@
 <?php
+// ----------------------------
+// Short URL PHP Satu Halaman
+// ----------------------------
+
+
+// File penyimpanan
+$dataFile = 'urls.json';
+if (!file_exists($dataFile)) file_put_contents($dataFile, '{}');
+$data = json_decode(file_get_contents($dataFile), true);
+
+
+// ----------------------------
+// Redirect otomatis jika punya kode
+// ----------------------------
+$req = trim($_SERVER['REQUEST_URI'], '/');
+if ($req !== '' && !isset($_GET['shorten'])) {
+if (isset($data[$req])) {
+header('Location: ' . $data[$req]);
+exit;
+}
+}
+
+
+// ----------------------------
+// Proses buat short URL
+// ----------------------------
+$shortURL = '';
+if (isset($_POST['url'])) {
+$url = trim($_POST['url']);
+if (filter_var($url, FILTER_VALIDATE_URL)) {
+$code = substr(md5(uniqid(true)), 0, 5);
+$data[$code] = $url;
+file_put_contents($dataFile, json_encode($data, JSON_PRETTY_PRINT));
+$domain = $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'];
+$shortURL = "$domain/$code";
+} else {
+$shortURL = 'URL tidak valid.';
+}
+}
+?>
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Short URL</title>
+<style>
 body {
 font-family: Arial;
 background: #0f0f0f;
@@ -23,51 +72,4 @@ margin-bottom: 20px;
 font-size: 26px;
 }
 input {
-width: 100%;
-padding: 12px;
-border-radius: 8px;
-border: none;
-margin-bottom: 15px;
-}
-button {
-width: 100%;
-padding: 12px;
-background: #6a5af9;
-border: none;
-border-radius: 8px;
-color: #fff;
-font-weight: bold;
-cursor: pointer;
-}
-button:hover {
-background: #8577ff;
-}
-.result {
-margin-top: 20px;
-padding: 10px;
-background: #222;
-border-radius: 8px;
-word-break: break-word;
-}
-</style>
-</head>
-<body>
-<div class="box">
-<h1>Pendekkan URL Anda</h1>
-
-
-<form method="POST">
-<input type="url" name="url" placeholder="Masukkan URL lengkap..." required>
-<button type="submit">Pendekkan</button>
-</form>
-
-
-<?php if ($shortURL): ?>
-<div class="result">
-<strong>Short URL:</strong><br>
-<a href="<?= $shortURL ?>" style="color:#8e7bff;"><?= $shortURL ?></a>
-</div>
-<?php endif; ?>
-</div>
-</body>
 </html>
