@@ -1,112 +1,132 @@
 <?php
-$shortUrl = '';
-$originalUrl = '';
+// --- FILE: index.php ---
 
+// Lokasi file penyimpanan
+$storage = __DIR__ . "/urls.json";
 
-/* --- CREATE/GENERATE SHORT URL --- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['url'])) {
-$url = trim($_POST['url']);
+// Jika file tidak ada, buat baru
+if (!file_exists($storage)) {
+    file_put_contents($storage, "{}");
+}
 
-
-if (filter_var($url, FILTER_VALIDATE_URL)) {
+// Muat data
 $data = json_decode(file_get_contents($storage), true);
 
+// **************************
+//  REDIRECT MODE
+// **************************
+$path = trim($_SERVER["REQUEST_URI"], "/");
 
-// generate code 5 chars
-$code = substr(md5(uniqid(rand(), true)), 0, 5);
-
-
-$data[$code] = $url;
-file_put_contents($storage, json_encode($data));
-
-
-$generated = true;
-$originalUrl = $url;
-$shortUrl = $_SERVER['HTTP_HOST'] . '/' . $code;
+if ($path !== "" && $path !== "index.php") {
+    if (isset($data[$path])) {
+        header("Location: " . $data[$path], true, 302);
+        exit;
+    } else {
+        http_response_code(404);
+        echo "<h1>404 - Short URL tidak ditemukan</h1>";
+        exit;
+    }
 }
+
+// **************************
+//  SHORTENER MODE (FORM UTAMA)
+// **************************
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $url = trim($_POST["url"]);
+    $custom = trim($_POST["custom"]);
+
+    // Validasi URL
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        $error = "URL tidak valid!";
+    } else {
+        // Jika custom kosong, buat random
+        if ($custom === "") {
+            $custom = substr(md5(time()), 0, 6);
+        }
+
+        // Cek jika code sudah ada
+        if (isset($data[$custom])) {
+            $error = "Kode short sudah digunakan!";
+        } else {
+            // Simpan data
+            $data[$custom] = $url;
+            file_put_contents($storage, json_encode($data, JSON_PRETTY_PRINT));
+
+            $base = (isset($_SERVER['HTTPS']) ? "https" : "http") . 
+                    "://" . $_SERVER['HTTP_HOST'] . "/";
+
+            $short_url = $base . $custom;
+        }
+    }
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Short URL Generator</title>
+<title>Short URL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-body { background: #0f0f15; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; padding: 20px; }
-.container { background: #1b1b28; padding: 30px; border-radius: 20px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 0 20px rgba(120,80,255,0.3); }
-input { width: 100%; padding: 12px; margin: 12px 0; border: none; border-radius: 10px; font-size: 16px; }
-button { width: 100%; padding: 12px; background: #7a5af8; border: none; border-radius: 10px; color: #fff; font-size: 18px; cursor: pointer; transition: 0.3s; }
-button:hover { background: #9876ff; }
-.result { margin-top: 20px; padding: 12px; background: #11111a; border-radius: 12px; word-wrap: break-word; }
-a { color: #7a5af8; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #111;
+        color: #fff;
+        padding: 30px;
+        text-align: center;
+    }
+    .box {
+        max-width: 400px;
+        margin: auto;
+        padding: 20px;
+        background: #1e1e1e;
+        border-radius: 10px;
+    }
+    input, button {
+        width: 100%;
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 8px;
+        border: none;
+        outline: none;
+    }
+    input { background: #333; color: #fff; }
+    button { background: #4CAF50; color: white; cursor: pointer; }
+    button:hover { background: #45A049; }
+    .short-link {
+        background: #222;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 10px;
+        display: block;
+        word-break: break-all;
+    }
 </style>
 </head>
 <body>
-<div class="container">
-<h2>Pembuat Short URL</h2>
+
+<h2>Short URL Sederhana</h2>
+<div class="box">
+
+<?php if (isset($error)): ?>
+    <div style="color: red"><?= $error ?></div>
+<?php endif; ?>
+
+<?php if (isset($short_url)): ?>
+    <h3>Short URL:</h3>
+    <a class="short-link" href="<?= $short_url ?>" target="_blank">
+        <?= $short_url ?>
+    </a>
+<?php else: ?>
+
 <form method="POST">
-<input type="url" name="url" placeholder="Masukkan URL lengkap" required>
-<button type="submit">Generate</button>
+    <input type="text" name="url" placeholder="Masukkan URL lengkap..." required>
+    <input type="text" name="custom" placeholder="Custom kode (opsional)">
+    <button type="submit">Generate Short URL</button>
 </form>
 
-
-<?php if ($generated): ?>
-<div class="result">
-<p><b>URL Asli:</b><br><?= htmlspecialchars($originalUrl) ?></p>
-<p><b>Short URL:</b><br>
-<a href="https://<?= htmlspecialchars($shortUrl) ?>" target="_blank">https://<?= htmlspecialchars($shortUrl) ?></a>
-</p>
-</div>
 <?php endif; ?>
+
 </div>
 </body>
 </html>
-
-
-<?php
-/* =====================================================
-AUTO REDIRECT HANDLER (CLEAN URL) - redirect.php merged
-This block only runs when redirect mode is triggered
-===================================================== */
-
-
-if (php_sapi_name() !== 'cli') {
-// check if accessing /code but NOT posting URL
-$req = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
-
-
-// skip if accessing root or index.php
-if ($req !== '' && $req !== 'index.php') {
-$data = json_decode(file_get_contents($storage), true);
-
-
-// sanitize
-$code = preg_replace('/[^a-zA-Z0-9]/', '', $req);
-
-
-if (isset($data[$code])) {
-$url = $data[$code];
-$parsed = parse_url($url);
-$allowed = ['http', 'https'];
-
-
-if (isset($parsed['scheme']) && in_array(strtolower($parsed['scheme']), $allowed)) {
-header('Location: ' . $url, true, 302);
-exit;
-} else {
-http_response_code(400);
-echo "URL tidak aman untuk diarahkan.";
-exit;
-}
-} else {
-http_response_code(404);
-echo "Short URL tidak ditemukan.";
-exit;
-}
-}
-}
-?>
