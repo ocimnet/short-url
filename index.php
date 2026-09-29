@@ -1,139 +1,177 @@
-<?php
-// ==============================
-// SHORT URL GENERATOR (1 FILE)
-// ==============================
-
-$FILE = __DIR__ . '/urls.json';
-
-// Jika tombol submit ditekan
-$shortened = null;
-$error = null;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $url = trim($_POST['url']);
-
-    if (!filter_var($url, FILTER_VALIDATE_URL)) {
-        $error = "URL tidak valid!";
-    } else {
-        // Pastikan file json ada
-        if (!file_exists($FILE)) {
-            file_put_contents($FILE, "{}");
-        }
-
-        // Buka file + kunci
-        $fp = fopen($FILE, 'c+');
-        flock($fp, LOCK_EX);
-
-        // Baca isi database json
-        $raw = stream_get_contents($fp);
-        $data = json_decode($raw, true);
-        if (!is_array($data)) $data = [];
-
-        // Generator kode acak
-        function genCode($length = 6) {
-            $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            $out = '';
-            for ($i = 0; $i < $length; $i++) {
-                $out .= $chars[random_int(0, strlen($chars)-1)];
-            }
-            return $out;
-        }
-
-        // Buat kode unik
-        $code = genCode();
-        while (isset($data[$code])) {
-            $code = genCode();
-        }
-
-        // Simpan URL asli
-        $data[$code] = $url;
-
-        // Simpan ke file json
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-        flock($fp, LOCK_UN);
-        fclose($fp);
-
-        // Buat short URL
-        $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . "/";
-
-        $shortened = $base . $code;
-    }
-}
-
-// ==============================
-// Redirect (jika user membuka /abc123)
-// ==============================
-$req = trim($_SERVER['REQUEST_URI'], "/");
-
-if ($req !== "" && $req !== basename(__FILE__)) {
-
-    if (file_exists($FILE)) {
-        $json = json_decode(file_get_contents($FILE), true);
-
-        if (isset($json[$req])) {
-            header("Location: " . $json[$req], true, 301);
-            exit;
-        }
-    }
-
-    // Jika kode tidak ditemukan
-    http_response_code(404);
-    echo "<h2>404 — Short URL tidak ditemukan</h2>";
-    exit;
-}
-
-// ==============================
-// HTML FORM
-// ==============================
-?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title>Short URL</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding-top: 60px;
-        }
-        input {
-            width: 350px;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        button {
-            padding: 10px 25px;
-        }
-        .box {
-            margin: 20px auto;
-            width: 400px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iframe Embed</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+    }
+
+    .header {
+      background: #111;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    .form-box {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .form-box input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      padding: 11px 18px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      background: #111;
+      color: white;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    .embed-box {
+      background: white;
+      padding: 5px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 650px;
+      border: none;
+      background: white;
+    }
+
+    .notice {
+      text-align: center;
+      color: #777;
+      font-size: 13px;
+      padding: 15px;
+    }
+
+    @media (max-width: 600px) {
+      iframe {
+        height: 500px;
+      }
+
+      .header h1 {
+        font-size: 18px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>Short URL Generator</h2>
+  <div class="header">
+    <h1>Iframe Embed</h1>
+  </div>
 
-<div class="box">
-    <form method="POST">
-        <input type="text" name="url" placeholder="Masukkan URL lengkap..." required>
-        <br>
-        <button type="submit">Shorten</button>
-    </form>
-</div>
+  <div class="container">
 
-<?php if ($shortened): ?>
-    <p><strong>Short URL:</strong></p>
-    <p><a href="<?= $shortened ?>"><?= $shortened ?></a></p>
-<?php endif; ?>
+    <div class="form-box">
+      <input
+        type="url"
+        id="urlInput"
+        placeholder="Masukkan URL yang ingin ditampilkan..."
+      >
 
-<?php if ($error): ?>
-    <p style="color:red;"><?= $error ?></p>
-<?php endif; ?>
+      <div class="buttons">
+        <button onclick="loadIframe()">Tampilkan</button>
+        <button onclick="fullscreenIframe()">Fullscreen</button>
+      </div>
+    </div>
+
+    <div class="embed-box" id="embedBox">
+      <iframe
+        id="myIframe"
+        src="about:blank"
+        allowfullscreen>
+      </iframe>
+    </div>
+
+    <div class="notice">
+      Pastikan website tujuan mengizinkan penggunaan iframe.
+    </div>
+
+  </div>
+
+  <script>
+    function loadIframe() {
+      const input = document.getElementById("urlInput");
+      const iframe = document.getElementById("myIframe");
+
+      let url = input.value.trim();
+
+      if (!url) {
+        alert("Silakan masukkan URL terlebih dahulu.");
+        return;
+      }
+
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "https://" + url;
+      }
+
+      iframe.src = url;
+    }
+
+    function fullscreenIframe() {
+      const iframe = document.getElementById("myIframe");
+
+      if (iframe.requestFullscreen) {
+        iframe.requestFullscreen();
+      } else if (iframe.webkitRequestFullscreen) {
+        iframe.webkitRequestFullscreen();
+      } else {
+        alert("Browser Anda tidak mendukung fullscreen.");
+      }
+    }
+  </script>
 
 </body>
 </html>
